@@ -1,0 +1,118 @@
+import anthropic
+import os
+from dotenv import load_dotenv
+from transformers import pipeline
+
+load_dotenv()
+
+# Claude 3.7 Sonnet client
+client = anthropic.Anthropic(api_key=os.environ.get("CLAUDE_API_KEY"))
+
+class InteractiveSocialPulse:
+    """
+    A class to analyze social media trends and sentiment using Claude API,
+    providing engaging and insightful summaries and analyses.
+    """
+
+    def __init__(self, topic):
+        """Initializes the analyzer with the given topic."""
+        self.topic = topic
+        self.sentiment = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+        self.emotion = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base")
+
+    def craft_dynamic_prompt(self):
+        """Constructs an engaging and detailed prompt for Claude."""
+        return f"""
+        Embark on a journey into the heart of social media discourse surrounding: "{self.topic}".
+        Your mission is to deliver a vibrant and insightful analysis, weaving together threads from diverse platforms.
+
+        Imagine you're a seasoned social media analyst, diving deep into the digital zeitgeist.
+        Uncover the raw emotions, the fervent debates, and the subtle shifts in public sentiment.
+
+        Here's your roadmap:
+
+        1.  **Platform Spotlight:** Illuminate the distinct voices of platforms like Reddit, Twitter, and beyond.
+            Paint a vivid picture of how each community engages with the topic.
+        2.  **Echoes of the Crowd:** Capture the essence of user reactions.
+            Imagine crafting compelling narratives from the digital chatter,
+            using paraphrased opinions and evocative language to bring the discussions to life.
+        3.  **Emotional Resonance:** Identify and articulate the prevailing emotions.
+            Are we witnessing a surge of excitement, a wave of concern, or a ripple of skepticism?
+            Use descriptive words to convey the emotional landscape.
+        4.  **Controversy and Currents:** Pinpoint the hot-button issues and emerging trends.
+            What are the sparks igniting debates? What are the undercurrents shaping the conversation?
+        5.  **Creative Synthesis:** Generate imaginative content that encapsulates the social media buzz.
+            Think compelling headlines, viral-worthy tweets, and meme concepts that resonate with the audience.
+        6.  **Deep Dive Exploration:** Conduct a comprehensive search of resources and social media sites.
+            Go beyond surface-level observations and unearth hidden gems of information.
+
+        Let's begin by exploring what the vibrant communities of Reddit have to contribute to this discourse.
+        Then, we'll venture into the dynamic realm of Twitter and other influential platforms.
+        """
+
+    def conduct_social_analysis(self):
+        """Sends the prompt to Claude, processes the response, and handles long text."""
+        prompt = self.craft_dynamic_prompt()
+        response = client.messages.create(
+            model="claude-3-7-sonnet-20250219",
+            max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        analysis_text = response.content[0].text.strip()
+
+        # Chunking and processing
+        chunk_size = 2000  # Adjust as needed
+        chunks = [analysis_text[i:i + chunk_size] for i in range(0, len(analysis_text), chunk_size)]
+
+        sentiment_results = []
+        emotion_results = []
+
+        for chunk in chunks:
+            sentiment_results.extend(self.sentiment(chunk))
+            emotion_results.extend(self.emotion(chunk))
+
+        # Basic aggregation (improve this for better results)
+        sentiment_analysis = sentiment_results
+        emotion_analysis = emotion_results
+
+        return {
+            "analysis": analysis_text,
+            "sentiment": sentiment_analysis,
+            "emotion": emotion_analysis,
+        }
+
+    def generate_concise_summary(self):
+        """Generates a succinct and engaging summary of the topic."""
+        prompt = f"""
+        Craft a compelling and concise summary of: "{self.topic}".
+        Imagine you're briefing a busy executive, capturing the core essence in a few impactful paragraphs.
+        """
+        response = client.messages.create(
+            model="claude-3-7-sonnet-20250219",
+            max_tokens=500,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.content[0].text.strip()
+
+def main():
+    """Main execution function."""
+    topic = input("Enter the topic to ignite the social media analysis: ")
+    analyzer = InteractiveSocialPulse(topic)
+
+    summary = analyzer.generate_concise_summary()
+    social_pulse = analyzer.conduct_social_analysis()
+
+    print("\n--- Executive Summary ---")
+    print(summary)
+
+    print("\n--- Social Pulse Analysis ---")
+    print(social_pulse["analysis"])
+
+    print("\n--- Sentiment Breakdown ---")
+    print(social_pulse["sentiment"])
+
+    print("\n--- Emotional Landscape ---")
+    print(social_pulse["emotion"])
+
+if __name__ == "__main__":
+    main()
