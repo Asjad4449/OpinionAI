@@ -1,0 +1,6 @@
+.env
+tokens
+debate_results.txt
+debate_results.json
+/__pycache__
+index.json
