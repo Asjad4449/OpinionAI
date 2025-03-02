@@ -1,65 +1,69 @@
+import os
+import base64
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 import numpy as np
-from collections import Counter
+from social_media import analyze_social_impact
 
 class SocialAnalyzer:
     def __init__(self):
-        self.graph_paths = ['social_impact.png', 'platform_distribution.png']
+        self.output_dir = "social_visualizations"
+        os.makedirs(self.output_dir, exist_ok=True)
+        self.graph_paths = [
+            os.path.join(self.output_dir, 'social_impact.png'),
+            os.path.join(self.output_dir, 'platform_distribution.png')
+        ]
 
     def analyze(self, debate_data):
         """
-        Analyzes debate data for social media metrics.
+        Quick social media analysis without visualizations.
         
         Args:
-            debate_data (dict): The debate data containing pros and cons
+            debate_data (dict): The debate data containing topic
             
         Returns:
-            list: Paths to the generated graph files
+            dict: Analysis results
         """
-        pros = [item['argument'] for item in debate_data.get('pros', [])]
-        cons = [item['argument'] for item in debate_data.get('cons', [])]
-        
-        # Example social media metrics (you can replace with real metrics)
-        engagement_scores = self._calculate_engagement(pros + cons)
-        platform_dist = self._analyze_platforms(pros + cons)
-        
-        # Generate and save graphs
-        self._generate_impact_graph(engagement_scores)
-        self._generate_platform_distribution(platform_dist)
-        
-        return self.graph_paths
+        try:
+            topic = debate_data.get('topic', '')
+            result = analyze_social_impact(topic)
+            
+            if not result.get('success'):
+                raise ValueError(result.get('error', 'Analysis failed'))
+                
+            return result['analysis']
+            
+        except Exception as e:
+            print(f"Error in social analysis: {str(e)}")
+            raise
 
-    def _calculate_engagement(self, arguments):
-        """Mock engagement calculation"""
-        return {
-            'shares': np.random.randint(100, 1000, len(arguments)),
-            'likes': np.random.randint(500, 5000, len(arguments)),
-            'comments': np.random.randint(50, 500, len(arguments))
-        }
-
-    def _analyze_platforms(self, arguments):
-        """Mock platform distribution"""
-        platforms = ['Twitter', 'Facebook', 'Reddit', 'Instagram']
-        return Counter({p: np.random.randint(10, 100) for p in platforms})
-
-    def _generate_impact_graph(self, engagement):
+    def _generate_social_graphs(self, data):
+        """Generates visualization graphs from social analysis data."""
+        # First graph - Social Impact
         plt.figure(figsize=(10, 6))
-        x = range(len(engagement['shares']))
-        plt.plot(x, engagement['shares'], 'b-', label='Shares')
-        plt.plot(x, engagement['likes'], 'g-', label='Likes')
-        plt.plot(x, engagement['comments'], 'r-', label='Comments')
-        plt.title('Social Media Engagement Over Time')
-        plt.xlabel('Arguments')
-        plt.ylabel('Engagement Count')
-        plt.legend()
-        plt.savefig(self.graph_paths[0], bbox_inches='tight')
+        sentiment_data = data['analysis']['emotional_data']
+        metrics = ['Sentiment', 'Engagement', 'Impact']
+        values = [
+            sentiment_data['sentiment_score'],
+            data['analysis']['metrics']['discussion_volume'] == 'High' and 0.8 or 0.5,
+            data['analysis']['metrics']['controversy_level'] == 'High' and 0.8 or 0.5
+        ]
+        
+        plt.bar(metrics, values, color=['#0d6efd', '#dc3545', '#198754'])
+        plt.title('Social Media Impact Analysis')
+        plt.ylabel('Score')
+        plt.savefig(self.graph_paths[0], bbox_inches='tight', dpi=300)
         plt.close()
 
-    def _generate_platform_distribution(self, platform_dist):
+        # Second graph - Platform Distribution
         plt.figure(figsize=(10, 6))
-        platforms = list(platform_dist.keys())
-        counts = list(platform_dist.values())
-        plt.pie(counts, labels=platforms, autopct='%1.1f%%')
-        plt.title('Discussion Distribution Across Platforms')
-        plt.savefig(self.graph_paths[1], bbox_inches='tight')
+        platforms = ['Reddit', 'Twitter', 'Other']
+        # Dummy values for demonstration
+        platform_values = [0.6, 0.8, 0.4]
+        
+        plt.bar(platforms, platform_values, color=['#ff4500', '#1da1f2', '#6c757d'])
+        plt.title('Platform Discussion Distribution')
+        plt.ylabel('Engagement Level')
+        plt.savefig(self.graph_paths[1], bbox_inches='tight', dpi=300)
         plt.close() 

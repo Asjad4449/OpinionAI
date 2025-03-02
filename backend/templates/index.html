@@ -37,7 +37,12 @@
 
         let data = await response.json();
         console.log("Received data:", data);
-        window.currentDebate = data; // Store the debate data globally
+        
+        // Store debate data globally with the topic
+        window.currentDebate = {
+          ...data,
+          topic: opinion  // Add the opinion as the topic
+        };
 
         // Stop and remove the loading message
         clearInterval(loadingInterval);
@@ -120,12 +125,27 @@
       chatContainer.insertAdjacentHTML('beforeend', `
         <div id="sentimentSection">
           <div id="sentimentContainer" class="hidden">
+            <div class="analysis-results">
+              <h3>Debate Analysis Results</h3>
+              <div id="proResults" class="side-results">
+                <h4>Pro Side</h4>
+                <div class="metrics"></div>
+              </div>
+              <div id="conResults" class="side-results">
+                <h4>Con Side</h4>
+                <div class="metrics"></div>
+              </div>
+              <div id="conclusion" class="conclusion"></div>
+            </div>
             <div class="graph-grid">
               <div class="graph-container">
-                <img id="graph1" alt="Sentiment Analysis" />
+                <img id="graph1" alt="Key Metrics" />
               </div>
               <div class="graph-container">
-                <img id="graph2" alt="Sentiment Flow" />
+                <img id="graph2" alt="Composite Scores" />
+              </div>
+              <div class="graph-container">
+                <img id="graph3" alt="Sentiment Radar" />
               </div>
             </div>
           </div>
@@ -136,13 +156,22 @@
       chatContainer.insertAdjacentHTML('beforeend', `
         <div id="socialSection">
           <div id="socialContainer" class="hidden">
-            <div class="graph-grid">
-              <div class="graph-container">
-                <img id="social1" alt="Social Media Impact" />
-              </div>
-              <div class="graph-container">
-                <img id="social2" alt="Platform Distribution" />
-              </div>
+            <div class="social-analysis">
+                <h3>Social Media Analysis</h3>
+                <div class="analysis-content">
+                    <div class="sentiment-section">
+                        <h4>Overall Social Sentiment</h4>
+                        <div class="sentiment-badge" id="socialSentiment"></div>
+                    </div>
+                    <div class="key-points-section">
+                        <h4>Key Discussion Points</h4>
+                        <div class="points-grid" id="keyPoints"></div>
+                    </div>
+                    <div class="platform-section">
+                        <h4>Platform Insights</h4>
+                        <div class="insights-box" id="platformInsights"></div>
+                    </div>
+                </div>
             </div>
           </div>
         </div>
@@ -189,10 +218,14 @@
       let socialContainer = document.getElementById("socialContainer");
       let socialToggle = document.getElementById("socialToggle");
 
-      // Close sources if open
+      // Close other containers if open
       if (sourcesDropdown.style.display === "block") {
         sourcesDropdown.style.display = "none";
         sourcesToggle.innerHTML = "Sources ⬇";
+      }
+      if (socialContainer.style.display === "block") {
+        socialContainer.style.display = "none";
+        socialToggle.innerHTML = "Social Analysis ⬇";
       }
 
       if (sentimentContainer.style.display === "none" || sentimentContainer.style.display === "") {
@@ -208,60 +241,123 @@
           
           const data = await response.json();
           
-          // Update the graphs
-          document.getElementById("graph1").src = data.graphs[0];
-          document.getElementById("graph2").src = data.graphs[1];
+          // Check if we have valid data before updating
+          if (data && data.graphs && Array.isArray(data.graphs)) {
+            // Update the graphs
+            document.getElementById("graph1").src = data.graphs[0] || '';
+            document.getElementById("graph2").src = data.graphs[1] || '';
+            document.getElementById("graph3").src = data.graphs[2] || '';
+
+            // Update analysis results
+            if (data.analysis) {
+              // Update Pro side metrics
+              const proMetrics = document.querySelector("#proResults .metrics");
+              proMetrics.innerHTML = formatMetrics(data.analysis["Pro Side"]);
+              
+              // Update Con side metrics
+              const conMetrics = document.querySelector("#conResults .metrics");
+              conMetrics.innerHTML = formatMetrics(data.analysis["Con Side"]);
+              
+              // Update conclusion
+              const conclusion = document.getElementById("conclusion");
+              conclusion.innerHTML = `
+                <h4>Conclusion</h4>
+                <p>${formatConclusion(data.analysis)}</p>
+              `;
+            }
+          } else {
+            console.error("Invalid response format:", data);
+          }
         } catch (error) {
           console.error("Error generating sentiment analysis:", error);
+          // Show error message to user
+          document.getElementById("conclusion").innerHTML = `
+            <h4>Error</h4>
+            <p>Failed to generate sentiment analysis. Please try again.</p>
+          `;
         }
       } else {
         sentimentContainer.style.display = "none";
         toggleButton.innerHTML = "Sentiment Analysis ⬇";
       }
+    }
 
-      // Close social analysis if open
-      if (socialContainer.style.display === "block") {
-        socialContainer.style.display = "none";
-        socialToggle.innerHTML = "Social Analysis ⬇";
-      }
+    function formatMetrics(sideData) {
+      return `
+        <div>Sentiment Score: ${sideData["Sentiment Score"]}</div>
+        <div>Emotional Intensity: ${sideData["Emotional Intensity"]}</div>
+        <div>Expert References: ${sideData["Expert References"]}</div>
+        <div>Practical Appeals: ${sideData["Practical Appeals"]}</div>
+        <div>Consistency Score: ${sideData["Consistency Score"]}</div>
+        <div>Counter-argument Engagement: ${sideData["Counter-argument Engagement"]}</div>
+      `;
+    }
+
+    function formatConclusion(analysis) {
+      const proScore = analysis["Pro Side"]["Composite Score"];
+      const conScore = analysis["Con Side"]["Composite Score"];
+      const winner = proScore > conScore ? "Pro side" : "Con side";
+      const margin = Math.abs(proScore - conScore);
+      const strength = margin > 0.1 ? "significantly" : margin > 0.05 ? "moderately" : "marginally";
+      
+      return `The ${winner} presents ${strength} stronger arguments (${proScore} vs ${conScore} composite score).`;
     }
 
     async function toggleSocialAnalysis() {
       let socialContainer = document.getElementById("socialContainer");
       let toggleButton = document.getElementById("socialToggle");
-      let sourcesDropdown = document.getElementById("sourcesDropdown");
-      let sourcesToggle = document.getElementById("sourcesToggle");
-      let sentimentContainer = document.getElementById("sentimentContainer");
-      let sentimentToggle = document.getElementById("sentimentToggle");
-
-      // Close other containers if open
-      if (sourcesDropdown.style.display === "block") {
-        sourcesDropdown.style.display = "none";
-        sourcesToggle.innerHTML = "Sources ⬇";
-      }
-      if (sentimentContainer.style.display === "block") {
-        sentimentContainer.style.display = "none";
-        sentimentToggle.innerHTML = "Sentiment Analysis ⬇";
-      }
 
       if (socialContainer.style.display === "none" || socialContainer.style.display === "") {
         socialContainer.style.display = "block";
         toggleButton.innerHTML = "Social Analysis ⬆";
         
         try {
+          if (!window.currentDebate || !window.currentDebate.topic) {
+            throw new Error("No debate topic available");
+          }
+
+          console.log("Current debate data:", window.currentDebate);
+          const requestData = { topic: window.currentDebate.topic };
+          console.log("Sending request data:", requestData);
+          
           const response = await fetch("/social_analysis", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(window.currentDebate)
+            body: JSON.stringify(requestData)
           });
           
           const data = await response.json();
+          console.log("Received response:", data);
           
-          // Update the graphs
-          document.getElementById("social1").src = data.graphs[0];
-          document.getElementById("social2").src = data.graphs[1];
+          if (data.success && data.data) {
+            // Update sentiment with color
+            const sentimentEl = document.getElementById("socialSentiment");
+            sentimentEl.textContent = data.data.sentiment;
+            // Add color based on sentiment
+            sentimentEl.className = 'sentiment-badge ' + data.data.sentiment.toLowerCase();
+            
+            // Update key points with grid layout
+            const keyPointsList = document.getElementById("keyPoints");
+            keyPointsList.innerHTML = data.data.key_points
+                .map(point => `<li>${point}</li>`)
+                .join('');
+            
+            // Update platform insights
+            document.getElementById("platformInsights").textContent = data.data.platform_insights;
+          } else {
+            document.querySelector(".analysis-content").innerHTML = `
+                <div class="error-message">
+                    Failed to analyze social media impact: ${data.error || 'Unknown error'}
+                </div>
+            `;
+          }
         } catch (error) {
-          console.error("Error generating social analysis:", error);
+          console.error("Error in social analysis:", error);
+          document.querySelector(".analysis-content").innerHTML = `
+                <div class="error-message">
+                    An error occurred while analyzing social media impact.
+                </div>
+            `;
         }
       } else {
         socialContainer.style.display = "none";
@@ -540,6 +636,91 @@
       width: 75%;
       display: none;
       margin: 10px auto 0;
+    }
+    .analysis-results {
+      background: #2c2d30;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .side-results {
+      margin: 15px 0;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .conclusion {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid #444;
+    }
+    .social-analysis {
+      background: #222325;
+      padding: 25px;
+      border-radius: 12px;
+      color: white;
+    }
+    .analysis-content {
+      margin-top: 20px;
+    }
+    .sentiment-section,
+    .key-points-section,
+    .platform-section {
+      background: #2c2d30;
+      padding: 20px;
+      margin: 15px 0;
+      border-radius: 12px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    .sentiment-badge {
+      display: inline-block;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: bold;
+      text-transform: capitalize;
+      margin-top: 10px;
+      background: #444654;
+    }
+    .points-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+    .points-grid li {
+      background: #444654;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 0;
+      list-style-type: none;
+      transition: transform 0.2s ease;
+    }
+    .points-grid li:hover {
+      transform: translateY(-2px);
+    }
+    .insights-box {
+      background: #444654;
+      padding: 20px;
+      border-radius: 8px;
+      margin-top: 15px;
+      line-height: 1.6;
+    }
+    .social-analysis h3 {
+      color: #fff;
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    .social-analysis h4 {
+      color: #fff;
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+    .error-message {
+      color: #dc3545;
+      text-align: center;
+      padding: 20px;
     }
   </style>
 </head>
