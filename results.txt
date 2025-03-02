@@ -1,0 +1,6 @@
+Pro Arguments Sentiment Scores:
+
+Con Arguments Sentiment Scores:
+
+Result:
+Both sides are equally strong based on sentiment analysis.
