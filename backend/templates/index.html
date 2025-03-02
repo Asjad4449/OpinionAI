@@ -100,7 +100,8 @@
         <div id="sourcesSection">
           <div class="buttons-container">
             <button id="sourcesToggle" onclick="toggleSources()">Sources ⬇</button>
-            <button id="imagesToggle" onclick="toggleSemanticAnalysis()">Semantic Analysis ⬇</button>
+            <button id="sentimentToggle" onclick="toggleSentimentAnalysis()">Sentiment Analysis ⬇</button>
+            <button id="socialToggle" onclick="toggleSocialAnalysis()">Social Analysis ⬇</button>
           </div>
           <div id="sourcesDropdown" class="hidden">
       `;
@@ -115,10 +116,10 @@
       sourcesHTML += `</div></div>`;
       chatContainer.insertAdjacentHTML('beforeend', sourcesHTML);
 
-      // Add the semantic analysis container (hidden by default)
+      // Add the sentiment analysis container (hidden by default)
       chatContainer.insertAdjacentHTML('beforeend', `
-        <div id="semanticSection">
-          <div id="semanticContainer" class="hidden">
+        <div id="sentimentSection">
+          <div id="sentimentContainer" class="hidden">
             <div class="graph-grid">
               <div class="graph-container">
                 <img id="graph1" alt="Sentiment Analysis" />
@@ -131,19 +132,37 @@
         </div>
       `);
 
+      // Add the social analysis container after sentiment container
+      chatContainer.insertAdjacentHTML('beforeend', `
+        <div id="socialSection">
+          <div id="socialContainer" class="hidden">
+            <div class="graph-grid">
+              <div class="graph-container">
+                <img id="social1" alt="Social Media Impact" />
+              </div>
+              <div class="graph-container">
+                <img id="social2" alt="Platform Distribution" />
+              </div>
+            </div>
+          </div>
+        </div>
+      `);
+
       chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
     }
 
     function toggleSources() {
       let sourcesDropdown = document.getElementById("sourcesDropdown");
       let sourcesToggle = document.getElementById("sourcesToggle");
-      let semanticContainer = document.getElementById("semanticContainer");
-      let semanticToggle = document.getElementById("imagesToggle");
+      let sentimentContainer = document.getElementById("sentimentContainer");
+      let sentimentToggle = document.getElementById("sentimentToggle");
+      let socialContainer = document.getElementById("socialContainer");
+      let socialToggle = document.getElementById("socialToggle");
 
-      // Close semantic analysis if open
-      if (semanticContainer.style.display === "block") {
-        semanticContainer.style.display = "none";
-        semanticToggle.innerHTML = "Semantic Analysis ⬇";
+      // Close sentiment analysis if open
+      if (sentimentContainer.style.display === "block") {
+        sentimentContainer.style.display = "none";
+        sentimentToggle.innerHTML = "Sentiment Analysis ⬇";
       }
 
       // Toggle sources
@@ -154,13 +173,21 @@
         sourcesDropdown.style.display = "none";
         sourcesToggle.innerHTML = "Sources ⬇";
       }
+
+      // Close social analysis if open
+      if (socialContainer.style.display === "block") {
+        socialContainer.style.display = "none";
+        socialToggle.innerHTML = "Social Analysis ⬇";
+      }
     }
 
-    async function toggleSemanticAnalysis() {
-      let semanticContainer = document.getElementById("semanticContainer");
-      let toggleButton = document.getElementById("imagesToggle");
+    async function toggleSentimentAnalysis() {
+      let sentimentContainer = document.getElementById("sentimentContainer");
+      let toggleButton = document.getElementById("sentimentToggle");
       let sourcesDropdown = document.getElementById("sourcesDropdown");
       let sourcesToggle = document.getElementById("sourcesToggle");
+      let socialContainer = document.getElementById("socialContainer");
+      let socialToggle = document.getElementById("socialToggle");
 
       // Close sources if open
       if (sourcesDropdown.style.display === "block") {
@@ -168,15 +195,15 @@
         sourcesToggle.innerHTML = "Sources ⬇";
       }
 
-      if (semanticContainer.style.display === "none" || semanticContainer.style.display === "") {
-        semanticContainer.style.display = "block";
-        toggleButton.innerHTML = "Semantic Analysis ⬆";
+      if (sentimentContainer.style.display === "none" || sentimentContainer.style.display === "") {
+        sentimentContainer.style.display = "block";
+        toggleButton.innerHTML = "Sentiment Analysis ⬆";
         
         try {
-          const response = await fetch("/semantic_analysis", {
+          const response = await fetch("/sentiment_analysis", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(window.currentDebate) // Send the entire debate data
+            body: JSON.stringify(window.currentDebate)
           });
           
           const data = await response.json();
@@ -185,11 +212,60 @@
           document.getElementById("graph1").src = data.graphs[0];
           document.getElementById("graph2").src = data.graphs[1];
         } catch (error) {
-          console.error("Error generating semantic analysis:", error);
+          console.error("Error generating sentiment analysis:", error);
         }
       } else {
-        semanticContainer.style.display = "none";
-        toggleButton.innerHTML = "Semantic Analysis ⬇";
+        sentimentContainer.style.display = "none";
+        toggleButton.innerHTML = "Sentiment Analysis ⬇";
+      }
+
+      // Close social analysis if open
+      if (socialContainer.style.display === "block") {
+        socialContainer.style.display = "none";
+        socialToggle.innerHTML = "Social Analysis ⬇";
+      }
+    }
+
+    async function toggleSocialAnalysis() {
+      let socialContainer = document.getElementById("socialContainer");
+      let toggleButton = document.getElementById("socialToggle");
+      let sourcesDropdown = document.getElementById("sourcesDropdown");
+      let sourcesToggle = document.getElementById("sourcesToggle");
+      let sentimentContainer = document.getElementById("sentimentContainer");
+      let sentimentToggle = document.getElementById("sentimentToggle");
+
+      // Close other containers if open
+      if (sourcesDropdown.style.display === "block") {
+        sourcesDropdown.style.display = "none";
+        sourcesToggle.innerHTML = "Sources ⬇";
+      }
+      if (sentimentContainer.style.display === "block") {
+        sentimentContainer.style.display = "none";
+        sentimentToggle.innerHTML = "Sentiment Analysis ⬇";
+      }
+
+      if (socialContainer.style.display === "none" || socialContainer.style.display === "") {
+        socialContainer.style.display = "block";
+        toggleButton.innerHTML = "Social Analysis ⬆";
+        
+        try {
+          const response = await fetch("/social_analysis", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(window.currentDebate)
+          });
+          
+          const data = await response.json();
+          
+          // Update the graphs
+          document.getElementById("social1").src = data.graphs[0];
+          document.getElementById("social2").src = data.graphs[1];
+        } catch (error) {
+          console.error("Error generating social analysis:", error);
+        }
+      } else {
+        socialContainer.style.display = "none";
+        toggleButton.innerHTML = "Social Analysis ⬇";
       }
     }
 
@@ -296,7 +372,7 @@
       margin-left: auto;
     }
     /* Sources and Images Buttons */
-    #sourcesSection, #imagesSection {
+    #sourcesSection, #sentimentSection, #socialSection {
       margin-top: 20px;
       width: 100%;
       display: flex;
@@ -309,7 +385,7 @@
       gap: 10px;
       margin-bottom: 10px;
     }
-    #sourcesToggle, #imagesToggle {
+    #sourcesToggle, #sentimentToggle, #socialToggle {
       background: #0d6efd;
       color: white;
       border: none;
@@ -320,10 +396,13 @@
       margin-bottom: 10px;
       flex: 0 0 auto; /* Prevent buttons from stretching */
     }
-    #imagesToggle {
-      background: #28a745; /* Green color for the Images button */
+    #sentimentToggle {
+      background: #28a745; /* Green color for the Sentiment button */
     }
-    #sourcesToggle:hover, #imagesToggle:hover {
+    #socialToggle {
+      background: #6f42c1; /* Purple color for the Social button */
+    }
+    #sourcesToggle:hover, #sentimentToggle:hover, #socialToggle:hover {
       opacity: 0.9;
     }
     /* Sources Dropdown */
@@ -428,8 +507,8 @@
     #closeButton:hover {
       background: #c0392b;
     }
-    /* Semantic Analysis Container */
-    #semanticContainer {
+    /* Sentiment Analysis Container */
+    #sentimentContainer {
       background: #222325;
       padding: 15px;
       border-radius: 12px;
@@ -453,8 +532,14 @@
       height: auto;
       border-radius: 4px;
     }
-    #imagesToggle {
-      background: #28a745;
+    /* Social Analysis Container */
+    #socialContainer {
+      background: #222325;
+      padding: 15px;
+      border-radius: 12px;
+      width: 75%;
+      display: none;
+      margin: 10px auto 0;
     }
   </style>
 </head>
