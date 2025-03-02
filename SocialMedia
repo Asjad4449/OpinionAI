@@ -2,6 +2,8 @@ import anthropic
 import os
 from dotenv import load_dotenv
 from transformers import pipeline
+import json
+import sys
 
 load_dotenv()
 
@@ -94,25 +96,22 @@ class InteractiveSocialPulse:
         )
         return response.content[0].text.strip()
 
-def main():
-    """Main execution function."""
-    topic = input("Enter the topic to ignite the social media analysis: ")
-    analyzer = InteractiveSocialPulse(topic)
+def main(topic):
+    """Main execution function, receives topic from friend's code."""
+    analyzer = InteractiveSocialPulse(topic_from_friend)
 
     summary = analyzer.generate_concise_summary()
     social_pulse = analyzer.conduct_social_analysis()
 
-    print("\n--- Executive Summary ---")
-    print(summary)
+    output_json = {
+        "summary": summary,
+        "social_analysis": social_pulse["analysis"],
+        "sentiment": social_pulse["sentiment"],
+        "emotion": social_pulse["emotion"]
+    }
 
-    print("\n--- Social Pulse Analysis ---")
-    print(social_pulse["analysis"])
-
-    print("\n--- Sentiment Breakdown ---")
-    print(social_pulse["sentiment"])
-
-    print("\n--- Emotional Landscape ---")
-    print(social_pulse["emotion"])
+    print(json.dumps(output_json, indent=4))
 
 if __name__ == "__main__":
-    main()
+    # Receive the topic from the command-line arguments.
+    main(string)
