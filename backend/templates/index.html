@@ -1,321 +1,340 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpinionAI Debate</title>
-    <script>
-        async function submitOpinion(event) {
-            event.preventDefault();
-            let opinionInput = document.getElementById("opinionInput");
-            let chatContainer = document.getElementById("chatContainer");
-            let opinionHeader = document.getElementById("opinionHeader");
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpinionAI Debate</title>
+  <script>
+    async function submitOpinion(event) {
+      event.preventDefault();
+      let opinionInput = document.getElementById("opinionInput");
+      let chatContainer = document.getElementById("chatContainer");
+      let opinionHeader = document.getElementById("opinionHeader");
 
-            let opinion = opinionInput.value.trim();
-            if (opinion === "") return;
+      let opinion = opinionInput.value.trim();
+      if (opinion === "") return;
 
-            // Display the opinion at the top
-            opinionHeader.innerHTML = `<h2>Your Opinion:</h2><p>${opinion}</p>`;
-            
-            // Hide the input container
-            document.getElementById("inputContainer").style.display = "none";
+      // Display the opinion at the top
+      opinionHeader.innerHTML = `<h2>Your Opinion:</h2><p>${opinion}</p>`;
+      
+      // Hide the input container
+      document.getElementById("inputContainer").style.display = "none";
 
-            // Show loading message
-            chatContainer.innerHTML = `<div class="message loading">Generating debate...</div>`;
+      // Show loading message
+      chatContainer.innerHTML = `<div class="message loading">Generating debate...</div>`;
 
-            try {
-                let response = await fetch("/generate", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ opinion: opinion })
-                });
+      try {
+        let response = await fetch("/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ opinion: opinion })
+        });
 
-                let data = await response.json();
-                console.log("Received data:", data);
+        let data = await response.json();
+        console.log("Received data:", data);
 
-                // Remove loading message
-                document.querySelector(".loading").remove();
+        // Remove loading message
+        document.querySelector(".loading").remove();
 
-                // Clear chat container before displaying debate messages
-                chatContainer.innerHTML = "";
+        // Clear chat container before displaying debate messages
+        chatContainer.innerHTML = "";
 
-                // Interleaved debate format (For -> Against)
-                let maxLength = Math.max(data.pros.length, data.cons.length);
-                for (let i = 0; i < maxLength; i++) {
-                    if (data.pros[i]) {
-                        chatContainer.innerHTML += `
-                            <div class="debate-container">
-                                <div class="message for">${data.pros[i].argument}</div>
-                            </div>
-                        `;
-                    }
-                    if (data.cons[i]) {
-                        chatContainer.innerHTML += `
-                            <div class="debate-container right-align">
-                                <div class="message against">${data.cons[i].argument}</div>
-                            </div>
-                        `;
-                    }
-                }
-
-                // Create Sources dropdown button
-                let sourcesHTML = `
-                    <div id="sourcesSection">
-                        <button id="sourcesToggle" onclick="toggleSources()">Sources ⬇</button>
-                        <div id="sourcesDropdown">
-                `;
-
-                data.sources.forEach((sourceList, index) => {
-                    sourcesHTML += `<p><b>Point ${index + 1} Sources:</b></p>`;
-                    if (Array.isArray(sourceList) && sourceList.length > 0) {
-                        sourceList.forEach(source => {
-                            sourcesHTML += `<p><a href="${source[1]}" target="_blank">${source[0]}</a></p>`;
-                        });
-                    }
-                });
-
-                sourcesHTML += `</div></div>`;
-
-                // Add sources section
-                chatContainer.innerHTML += sourcesHTML;
-
-                // Keep the chat at the top
-                chatContainer.scrollTop = 0;
-            } catch (error) {
-                console.error("Error fetching debate:", error);
-            }
+        // Build an array of debate messages interleaved (for then against)
+        let debateMessages = [];
+        let maxLength = Math.max(data.pros.length, data.cons.length);
+        for (let i = 0; i < maxLength; i++) {
+          if (data.pros[i]) {
+            debateMessages.push({ type: "for", argument: data.pros[i].argument });
+          }
+          if (data.cons[i]) {
+            debateMessages.push({ type: "against", argument: data.cons[i].argument });
+          }
         }
 
-        function resetDebate() {
-            document.getElementById("opinionHeader").innerHTML = "";
-            document.getElementById("chatContainer").innerHTML = "";
-            document.getElementById("inputContainer").style.display = "flex";
-            document.getElementById("opinionInput").value = "";
-        }
+        // Display messages one at a time with 750ms delay and fade-in effect
+        let currentIndex = 0;
+        let intervalId = setInterval(() => {
+          if (currentIndex < debateMessages.length) {
+            let msg = debateMessages[currentIndex];
+            let containerClass = (msg.type === "for") ? "debate-container" : "debate-container right-align";
+            let messageClass = (msg.type === "for") ? "message for fade-in" : "message against fade-in";
+            chatContainer.innerHTML += `
+              <div class="${containerClass}">
+                <div class="${messageClass}">${msg.argument}</div>
+              </div>
+            `;
+            currentIndex++;
+            // Scroll to bottom so new message is visible
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+          } else {
+            clearInterval(intervalId);
+            // After debate messages, append the sources dropdown
+            appendSources(data.sources);
+          }
+        }, 750);
+      } catch (error) {
+        console.error("Error fetching debate:", error);
+      }
+    }
 
-        function toggleSources() {
-            let dropdown = document.getElementById("sourcesDropdown");
-            let toggleButton = document.getElementById("sourcesToggle");
-            if (dropdown.style.display === "none" || dropdown.style.display === "") {
-                dropdown.style.display = "block";
-                toggleButton.innerHTML = "Sources ⬆";
-            } else {
-                dropdown.style.display = "none";
-                toggleButton.innerHTML = "Sources ⬇";
-            }
+    function appendSources(sourcesData) {
+      let chatContainer = document.getElementById("chatContainer");
+      let sourcesHTML = `
+        <div id="sourcesSection">
+          <button id="sourcesToggle" onclick="toggleSources()">Sources ⬇</button>
+          <div id="sourcesDropdown" class="hidden">
+      `;
+      sourcesData.forEach((sourceList, index) => {
+        sourcesHTML += `<p><b>Point ${index + 1} Sources:</b></p>`;
+        if (Array.isArray(sourceList) && sourceList.length > 0) {
+          sourceList.forEach(source => {
+            sourcesHTML += `<p><a href="${source[1]}" target="_blank">${source[0]}</a></p>`;
+          });
         }
-    </script>    
+      });
+      sourcesHTML += `</div></div>`;
+      chatContainer.innerHTML += sourcesHTML;
+      // Scroll to bottom so the sources dropdown button is visible
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
 
-    <style>
-        /* General Styling */
-        body { 
-            font-family: Arial, sans-serif; 
-            background: #343541; 
-            color: white;
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            height: 100vh;
-            padding: 20px;
-            position: relative;
-        }
+    function resetDebate() {
+      document.getElementById("opinionHeader").innerHTML = "";
+      document.getElementById("chatContainer").innerHTML = "";
+      document.getElementById("inputContainer").style.display = "flex";
+      document.getElementById("opinionInput").value = "";
+    }
 
-        h1 {
-            font-size: 36px;
-            font-weight: bold;
-        }
-        
-        #opinionHeader {
-            font-size: 22px;
-            font-weight: bold;
-            text-align: center;
-            margin-bottom: 15px;
-            max-width: 90%;
-        }
+    function toggleSources() {
+      let dropdown = document.getElementById("sourcesDropdown");
+      let toggleButton = document.getElementById("sourcesToggle");
+      if (dropdown.style.display === "none" || dropdown.style.display === "") {
+        dropdown.style.display = "block";
+        toggleButton.innerHTML = "Sources ⬆";
+      } else {
+        dropdown.style.display = "none";
+        toggleButton.innerHTML = "Sources ⬇";
+      }
+    }
+  </script>
+  <style>
+    /* Fade-in Animation */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .fade-in {
+      animation: fadeIn 0.75s ease;
+    }
 
-        /* Key in the top-right corner */
-        #key {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: #222325;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 14px;
-        }
+    /* General Styling */
+    body {
+      font-family: Arial, sans-serif;
+      background: #343541;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100vh;
+      padding: 20px;
+      position: relative;
+    }
 
-        #key span {
-            display: block;
-            margin-bottom: 5px;
-        }
+    h1 {
+      font-size: 36px;
+      font-weight: bold;
+    }
 
-        /* Chat Window */
-        #chatContainer { 
-            width: 80%;
-            height: 70vh;
-            overflow-y: auto; 
-            background: #444654; 
-            padding: 25px; 
-            border-radius: 12px; 
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-        }
-        
-        .message { 
-            padding: 20px;
-            margin: 12px 0; 
-            border-radius: 12px; 
-            max-width: 65%;
-            font-size: 20px;
-            line-height: 1.6;
-            color: white;
-        }
+    #opinionHeader {
+      font-size: 22px;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 15px;
+      max-width: 90%;
+    }
 
-        .debate-container {
-            display: flex;
-            justify-content: flex-start; 
-            width: 100%;
-        }
+    /* Key in the top-right corner */
+    #key {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: #222325;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
 
-        .right-align {
-            justify-content: flex-end;
-        }
-        
-        .for { 
-            background: #0d6efd;
-            text-align: left;
-            margin-right: auto;
-        }
-        
-        .against { 
-            background: #dc3545;
-            text-align: right;
-            margin-left: auto;
-        }
+    #key span {
+      display: block;
+      margin-bottom: 5px;
+    }
 
-        /* Sources Dropdown */
-        #sourcesSection {
-            text-align: center;
-            margin-top: 20px;
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+    /* Chat Window */
+    #chatContainer {
+      width: 80%;
+      height: 70vh;
+      overflow-y: auto;
+      background: #444654;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+    }
 
-        #sourcesToggle {
-            background: #0d6efd;
-            color: white;
-            border: none;
-            padding: 12px 18px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 18px;
-            margin-bottom: 10px;
-        }
+    .message {
+      padding: 20px;
+      margin: 12px 0;
+      border-radius: 12px;
+      max-width: 65%;
+      font-size: 20px;
+      line-height: 1.6;
+      color: white;
+    }
 
-        #sourcesToggle:hover {
-            background: #0b5ed7;
-        }
+    .debate-container {
+      display: flex;
+      justify-content: flex-start;
+      width: 100%;
+    }
 
-        #sourcesDropdown {
-            background: #222325;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-            max-width: 60%;
-            display: none;
-        }
+    .right-align {
+      justify-content: flex-end;
+    }
 
-        #sourcesDropdown p {
-            margin: 8px 0;
-            font-size: 18px;
-        }
+    .for {
+      background: #0d6efd;
+      text-align: left;
+      margin-right: auto;
+    }
 
-        #sourcesDropdown a {
-            color: #0d6efd;
-            text-decoration: none;
-        }
+    .against {
+      background: #dc3545;
+      text-align: right;
+      margin-left: auto;
+    }
 
-        #sourcesDropdown a:hover {
-            text-decoration: underline;
-        }
+    /* Sources Dropdown */
+    #sourcesSection {
+      margin-top: 20px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
 
-        /* Input Field & Button */
-        #inputContainer { 
-            margin-top: 20px; 
-            width: 80%;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background: #444654;
-            border-radius: 8px;
-            padding: 12px;
-        }
-        
-        input { 
-            flex: 1;
-            padding: 14px; 
-            font-size: 18px;
-            background: transparent;
-            border: none;
-            color: white;
-            outline: none;
-        }
+    #sourcesToggle {
+      background: #0d6efd;
+      color: white;
+      border: none;
+      padding: 12px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
 
-        button { 
-            background: #0d6efd;
-            color: white;
-            border: none;
-            padding: 14px 18px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 18px;
-        }
+    #sourcesToggle:hover {
+      background: #0b5ed7;
+    }
 
-        button:hover {
-            background: #0b5ed7;
-        }
+    #sourcesDropdown {
+      background: #222325;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+      max-width: 60%;
+      display: none;
+      margin: 0 auto; /* Center the dropdown */
+    }
 
-        /* Close Button */
-        #closeButton {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            font-size: 18px;
-            background: #e74c3c;
-            color: white;
-            border: none;
-            padding: 12px 18px;
-            border-radius: 8px;
-            cursor: pointer;
-        }
+    #sourcesDropdown p {
+      margin: 8px 0;
+      font-size: 18px;
+    }
 
-        #closeButton:hover {
-            background: #c0392b;
-        }
+    #sourcesDropdown a {
+      color: #0d6efd;
+      text-decoration: none;
+    }
 
-    </style>
+    #sourcesDropdown a:hover {
+      text-decoration: underline;
+    }
+
+    /* Input Field & Button */
+    #inputContainer {
+      margin-top: 20px;
+      width: 80%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #444654;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    input {
+      flex: 1;
+      padding: 14px;
+      font-size: 18px;
+      background: transparent;
+      border: none;
+      color: white;
+      outline: none;
+    }
+
+    button {
+      background: #0d6efd;
+      color: white;
+      border: none;
+      padding: 14px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 18px;
+    }
+
+    button:hover {
+      background: #0b5ed7;
+    }
+
+    /* Close Button */
+    #closeButton {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-size: 18px;
+      background: #e74c3c;
+      color: white;
+      border: none;
+      padding: 12px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    #closeButton:hover {
+      background: #c0392b;
+    }
+  </style>
 </head>
 <body>
-
-    <button id="closeButton" onclick="resetDebate()">Close</button>
-    <div id="key">
-        <span style="color: #0d6efd;">🔵 For</span>
-        <span style="color: #dc3545;">🔴 Against</span>
-    </div>
-
-    <h1>OpinionAI</h1>
-
-    <div id="opinionHeader"></div>
-
-    <div id="chatContainer"></div>
-
-    <div id="inputContainer">
-        <form onsubmit="submitOpinion(event)" style="display: flex; width: 100%;">
-            <input type="text" id="opinionInput" placeholder="Enter your opinion..." required>
-            <button type="submit">➤</button>
-        </form>
-    </div>
-
+  <button id="closeButton" onclick="resetDebate()">Close</button>
+  <div id="key">
+    <span style="color: #0d6efd;">🔵 For</span>
+    <span style="color: #dc3545;">🔴 Against</span>
+  </div>
+  <h1>OpinionAI</h1>
+  <div id="opinionHeader"></div>
+  <div id="chatContainer"></div>
+  <div id="inputContainer">
+    <form onsubmit="submitOpinion(event)" style="display: flex; width: 100%;">
+      <input type="text" id="opinionInput" placeholder="Enter your opinion..." required />
+      <button type="submit">➤</button>
+    </form>
+  </div>
 </body>
 </html>

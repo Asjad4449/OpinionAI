@@ -94,7 +94,8 @@ def structured_debate(statement, num_rounds=5):
         point_num = (i // 2) + 1
 
         # Fetch **new** relevant sources for each argument
-        sources = fetch_references(statement, stance, counter=i)
+        #sources = fetch_references(statement, stance, counter=i)
+        sources = ""
 
         # Convert existing arguments to plain text for history context
         history_text = "\n".join(
