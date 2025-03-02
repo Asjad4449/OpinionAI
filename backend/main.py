@@ -82,7 +82,7 @@ def generate_argument(statement, stance, debate_history, sources):
 
     return response.content[0].text.strip()
 
-def structured_debate(statement, num_rounds=5):
+def structured_debate(statement, num_rounds=1):
     """
     Conducts a structured debate with alternating arguments.
     Returns a structured dictionary with `pros`, `cons`, and `sources`.

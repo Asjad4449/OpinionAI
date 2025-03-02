@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OpinionAI Debate</title>
   <script>
+    let loadingInterval; // Global variable for loading animation
+
     async function submitOpinion(event) {
       event.preventDefault();
       let opinionInput = document.getElementById("opinionInput");
@@ -20,8 +22,11 @@
       // Hide the input container
       document.getElementById("inputContainer").style.display = "none";
 
-      // Show loading message
-      chatContainer.innerHTML = `<div class="message loading">Generating debate...</div>`;
+      // Show loading message with an id for animation
+      chatContainer.innerHTML = `<div class="message loading" id="loadingMessage">Generating debate</div>`;
+      
+      // Start the loading animation
+      startLoadingAnimation();
 
       try {
         let response = await fetch("/generate", {
@@ -32,14 +37,17 @@
 
         let data = await response.json();
         console.log("Received data:", data);
+        window.currentDebate = data; // Store the debate data globally
 
-        // Remove loading message
-        document.querySelector(".loading").remove();
+        // Stop and remove the loading message
+        clearInterval(loadingInterval);
+        let loadingMsg = document.getElementById("loadingMessage");
+        if (loadingMsg) loadingMsg.remove();
 
         // Clear chat container before displaying debate messages
         chatContainer.innerHTML = "";
 
-        // Build an array of debate messages interleaved (for then against)
+        // Build an array of debate messages interleaving for and against
         let debateMessages = [];
         let maxLength = Math.max(data.pros.length, data.cons.length);
         for (let i = 0; i < maxLength; i++) {
@@ -51,37 +59,49 @@
           }
         }
 
-        // Display messages one at a time with 750ms delay and fade-in effect
+        // Display messages one at a time with a 2-second delay and smooth scrolling
         let currentIndex = 0;
         let intervalId = setInterval(() => {
           if (currentIndex < debateMessages.length) {
             let msg = debateMessages[currentIndex];
-            let containerClass = (msg.type === "for") ? "debate-container" : "debate-container right-align";
-            let messageClass = (msg.type === "for") ? "message for fade-in" : "message against fade-in";
-            chatContainer.innerHTML += `
+            let containerClass = msg.type === "for" ? "debate-container" : "debate-container right-align";
+            let messageClass = msg.type === "for" ? "message for fade-in" : "message against fade-in";
+            chatContainer.insertAdjacentHTML('beforeend', `
               <div class="${containerClass}">
                 <div class="${messageClass}">${msg.argument}</div>
               </div>
-            `;
+            `);
             currentIndex++;
-            // Scroll to bottom so new message is visible
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
           } else {
             clearInterval(intervalId);
-            // After debate messages, append the sources dropdown
+            // After all messages, append the sources and images sections
             appendSources(data.sources);
           }
-        }, 750);
+        }, 2000);
       } catch (error) {
         console.error("Error fetching debate:", error);
       }
+    }
+
+    function startLoadingAnimation() {
+      let loadingElement = document.getElementById("loadingMessage");
+      let dots = 0;
+      loadingInterval = setInterval(() => {
+        dots = (dots + 1) % 4; // cycles: 0, 1, 2, 3
+        let dotStr = ".".repeat(dots);
+        loadingElement.innerText = "Generating debate" + dotStr;
+      }, 500);
     }
 
     function appendSources(sourcesData) {
       let chatContainer = document.getElementById("chatContainer");
       let sourcesHTML = `
         <div id="sourcesSection">
-          <button id="sourcesToggle" onclick="toggleSources()">Sources ⬇</button>
+          <div class="buttons-container">
+            <button id="sourcesToggle" onclick="toggleSources()">Sources ⬇</button>
+            <button id="imagesToggle" onclick="toggleSemanticAnalysis()">Semantic Analysis ⬇</button>
+          </div>
           <div id="sourcesDropdown" class="hidden">
       `;
       sourcesData.forEach((sourceList, index) => {
@@ -93,9 +113,89 @@
         }
       });
       sourcesHTML += `</div></div>`;
-      chatContainer.innerHTML += sourcesHTML;
-      // Scroll to bottom so the sources dropdown button is visible
-      chatContainer.scrollTop = chatContainer.scrollHeight;
+      chatContainer.insertAdjacentHTML('beforeend', sourcesHTML);
+
+      // Add the semantic analysis container (hidden by default)
+      chatContainer.insertAdjacentHTML('beforeend', `
+        <div id="semanticSection">
+          <div id="semanticContainer" class="hidden">
+            <div class="graph-grid">
+              <div class="graph-container">
+                <img id="graph1" alt="Sentiment Analysis" />
+              </div>
+              <div class="graph-container">
+                <img id="graph2" alt="Sentiment Flow" />
+              </div>
+            </div>
+          </div>
+        </div>
+      `);
+
+      chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
+    }
+
+    function toggleSources() {
+      let sourcesDropdown = document.getElementById("sourcesDropdown");
+      let sourcesToggle = document.getElementById("sourcesToggle");
+      let semanticContainer = document.getElementById("semanticContainer");
+      let semanticToggle = document.getElementById("imagesToggle");
+
+      // Close semantic analysis if open
+      if (semanticContainer.style.display === "block") {
+        semanticContainer.style.display = "none";
+        semanticToggle.innerHTML = "Semantic Analysis ⬇";
+      }
+
+      // Toggle sources
+      if (sourcesDropdown.style.display === "none" || sourcesDropdown.style.display === "") {
+        sourcesDropdown.style.display = "block";
+        sourcesToggle.innerHTML = "Sources ⬆";
+      } else {
+        sourcesDropdown.style.display = "none";
+        sourcesToggle.innerHTML = "Sources ⬇";
+      }
+    }
+
+    async function toggleSemanticAnalysis() {
+      let semanticContainer = document.getElementById("semanticContainer");
+      let toggleButton = document.getElementById("imagesToggle");
+      let sourcesDropdown = document.getElementById("sourcesDropdown");
+      let sourcesToggle = document.getElementById("sourcesToggle");
+
+      // Close sources if open
+      if (sourcesDropdown.style.display === "block") {
+        sourcesDropdown.style.display = "none";
+        sourcesToggle.innerHTML = "Sources ⬇";
+      }
+
+      if (semanticContainer.style.display === "none" || semanticContainer.style.display === "") {
+        semanticContainer.style.display = "block";
+        toggleButton.innerHTML = "Semantic Analysis ⬆";
+        
+        try {
+          const response = await fetch("/semantic_analysis", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(window.currentDebate) // Send the entire debate data
+          });
+          
+          const data = await response.json();
+          
+          // Update the graphs
+          document.getElementById("graph1").src = data.graphs[0];
+          document.getElementById("graph2").src = data.graphs[1];
+        } catch (error) {
+          console.error("Error generating semantic analysis:", error);
+        }
+      } else {
+        semanticContainer.style.display = "none";
+        toggleButton.innerHTML = "Semantic Analysis ⬇";
+      }
+    }
+
+    function handleImageClick(imageNumber) {
+      alert(`Image ${imageNumber} clicked!`);
+      // You can add more functionality here based on which image is clicked
     }
 
     function resetDebate() {
@@ -103,18 +203,6 @@
       document.getElementById("chatContainer").innerHTML = "";
       document.getElementById("inputContainer").style.display = "flex";
       document.getElementById("opinionInput").value = "";
-    }
-
-    function toggleSources() {
-      let dropdown = document.getElementById("sourcesDropdown");
-      let toggleButton = document.getElementById("sourcesToggle");
-      if (dropdown.style.display === "none" || dropdown.style.display === "") {
-        dropdown.style.display = "block";
-        toggleButton.innerHTML = "Sources ⬆";
-      } else {
-        dropdown.style.display = "none";
-        toggleButton.innerHTML = "Sources ⬇";
-      }
     }
   </script>
   <style>
@@ -134,23 +222,21 @@
     }
 
     /* General Styling */
-    body {
-      font-family: Arial, sans-serif;
-      background: #343541;
+    body { 
+      font-family: Arial, sans-serif; 
+      background: #343541; 
       color: white;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
       height: 100vh;
       padding: 20px;
       position: relative;
     }
-
     h1 {
       font-size: 36px;
       font-weight: bold;
     }
-
     #opinionHeader {
       font-size: 22px;
       font-weight: bold;
@@ -158,7 +244,6 @@
       margin-bottom: 15px;
       max-width: 90%;
     }
-
     /* Key in the top-right corner */
     #key {
       position: absolute;
@@ -169,65 +254,62 @@
       border-radius: 8px;
       font-size: 14px;
     }
-
     #key span {
       display: block;
       margin-bottom: 5px;
     }
-
     /* Chat Window */
-    #chatContainer {
+    #chatContainer { 
       width: 80%;
       height: 70vh;
-      overflow-y: auto;
-      background: #444654;
-      padding: 25px;
-      border-radius: 12px;
+      overflow-y: auto; 
+      background: #444654; 
+      padding: 25px; 
+      border-radius: 12px; 
       box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
     }
-
-    .message {
+    .message { 
       padding: 20px;
-      margin: 12px 0;
-      border-radius: 12px;
+      margin: 12px 0; 
+      border-radius: 12px; 
       max-width: 65%;
       font-size: 20px;
       line-height: 1.6;
       color: white;
     }
-
     .debate-container {
       display: flex;
-      justify-content: flex-start;
+      justify-content: flex-start; 
       width: 100%;
     }
-
     .right-align {
       justify-content: flex-end;
     }
-
-    .for {
+    .for { 
       background: #0d6efd;
       text-align: left;
       margin-right: auto;
     }
-
-    .against {
+    .against { 
       background: #dc3545;
       text-align: right;
       margin-left: auto;
     }
-
-    /* Sources Dropdown */
-    #sourcesSection {
+    /* Sources and Images Buttons */
+    #sourcesSection, #imagesSection {
       margin-top: 20px;
       width: 100%;
       display: flex;
       flex-direction: column;
       align-items: center;
     }
-
-    #sourcesToggle {
+    .buttons-container {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    #sourcesToggle, #imagesToggle {
       background: #0d6efd;
       color: white;
       border: none;
@@ -236,39 +318,71 @@
       cursor: pointer;
       font-size: 18px;
       margin-bottom: 10px;
+      flex: 0 0 auto; /* Prevent buttons from stretching */
     }
-
-    #sourcesToggle:hover {
-      background: #0b5ed7;
+    #imagesToggle {
+      background: #28a745; /* Green color for the Images button */
     }
-
+    #sourcesToggle:hover, #imagesToggle:hover {
+      opacity: 0.9;
+    }
+    /* Sources Dropdown */
     #sourcesDropdown {
       background: #222325;
       padding: 15px;
       border-radius: 8px;
       text-align: center;
-      max-width: 60%;
+      width: fit-content;
+      max-width: 75%;
+      min-width: 300px;
       display: none;
-      margin: 0 auto; /* Center the dropdown */
+      margin: 0 auto;
     }
-
     #sourcesDropdown p {
       margin: 8px 0;
       font-size: 18px;
+      word-wrap: break-word; /* Ensures long words/URLs don't overflow */
+      overflow-wrap: break-word;
     }
-
     #sourcesDropdown a {
       color: #0d6efd;
       text-decoration: none;
     }
-
     #sourcesDropdown a:hover {
       text-decoration: underline;
     }
-
+    /* Images Container */
+    #imagesContainer {
+      background: #222325;
+      padding: 15px;
+      border-radius: 12px;
+      width: 75%;
+      height: 70vh;
+      display: none;
+      margin: 10px auto 0; /* Position below the buttons */
+      overflow-y: auto;
+    }
+    .image-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: 10px;
+      height: 100%;
+    }
+    .image-grid img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    .image-grid img:hover {
+      transform: scale(1.05);
+    }
     /* Input Field & Button */
-    #inputContainer {
-      margin-top: 20px;
+    #inputContainer { 
+      margin-top: 20px; 
       width: 80%;
       display: flex;
       align-items: center;
@@ -277,18 +391,16 @@
       border-radius: 8px;
       padding: 12px;
     }
-
-    input {
+    input { 
       flex: 1;
-      padding: 14px;
+      padding: 14px; 
       font-size: 18px;
       background: transparent;
       border: none;
       color: white;
       outline: none;
     }
-
-    button {
+    button { 
       background: #0d6efd;
       color: white;
       border: none;
@@ -297,11 +409,9 @@
       cursor: pointer;
       font-size: 18px;
     }
-
     button:hover {
       background: #0b5ed7;
     }
-
     /* Close Button */
     #closeButton {
       position: absolute;
@@ -315,9 +425,36 @@
       border-radius: 8px;
       cursor: pointer;
     }
-
     #closeButton:hover {
       background: #c0392b;
+    }
+    /* Semantic Analysis Container */
+    #semanticContainer {
+      background: #222325;
+      padding: 15px;
+      border-radius: 12px;
+      width: 75%;
+      display: none;
+      margin: 10px auto 0;
+    }
+    .graph-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+      padding: 10px;
+    }
+    .graph-container {
+      background: #2c2d30;
+      padding: 15px;
+      border-radius: 8px;
+    }
+    .graph-container img {
+      width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+    #imagesToggle {
+      background: #28a745;
     }
   </style>
 </head>

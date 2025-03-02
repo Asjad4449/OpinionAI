@@ -4,3 +4,6 @@ debate_results.txt
 debate_results.json
 /__pycache__/
 index.json
+.DS_Store
+temp_debate.json
+backend/__pycache__/main.cpython-310.pyc
